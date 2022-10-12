@@ -15,8 +15,6 @@ from macro_event_yh import run_macro_event_yh
 from plot_templates import plot_templates
 from record_hilo import get_titlehead
 from ticker2label import ticker2label,t2l
-from webReader import webReader,streamReader,yhReader
-from fredReader import fredReader
 import types
 unLst=['popen','Call','OLD','TBD','_DEPRECATED','Popen','__']
 talan_vars = {k:v for (k,v) in globals().items() if callable(v) and not any(map(k.__contains__,unLst)) and isinstance(v,types.FunctionType) and v.__doc__} 

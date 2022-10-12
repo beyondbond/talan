@@ -3,7 +3,7 @@ TALAN
 =====
 A Technical Algorithmic Analytics Python Package
 """
-__version__ = "0.1.4"
+__version__ = "0.1.3"
 __author__ = 'Ted Hong'
 __credits__ = 'Beyondbond Risk Lab'
 __name__ = 'talan'
