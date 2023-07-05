@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.8
 ''' get basic info from a list of tickers 'tkLst'
 required tables:
   mapping_ticker_cik (pgDB)
@@ -24,7 +24,7 @@ if sys.version_info.major == 2:
 def tk2infoM(ticker='',tablename='yh_curr_quote',colx='ticker',dbname='ara',clientM=None,**optx):
 	from yh_chart import runOTF,yh_financials,yh_quote_comparison;
 	from _alan_str import find_mdb
-	funcArg,zpk,deltaTolerance=getKeyVal(optx,["funcArg","zpk","deltaTolerance"],['yh_financials',{'ticker'},1800])
+	funcN,zpk,deltaTolerance=getKeyVal(optx,["funcN","zpk","deltaTolerance"],['yh_financials',{'ticker'},1800])
 	modules = optx.pop('modules','')
 	jobj = {colx:ticker}
 	df=[]
@@ -34,8 +34,8 @@ def tk2infoM(ticker='',tablename='yh_curr_quote',colx='ticker',dbname='ara',clie
 			sys.stderr.write(" --{} found in {}:\n{}\n".format(ticker,tablename,df)[:100]+"\n")
 			return df
 		else:
-			datax=runOTF(funcArg,ticker,deltaTolerance=deltaTolerance,modules=modules,dbname=dbname,tablename=tablename,zpk=zpk)
-			#datax=locals()[funcArg](ticker,deltaTolerance=deltaTolerance,modules=modules,dbname=dbname,tablename=tablename,zpk=zpk)
+			datax=runOTF(ticker,funcN,deltaTolerance=deltaTolerance,modules=modules,dbname=dbname,tablename=tablename,zpk=zpk)
+			#datax=locals()[funcN](ticker,deltaTolerance=deltaTolerance,modules=modules,dbname=dbname,tablename=tablename,zpk=zpk)
 			if len(datax)<1:
 				sys.stderr.write(" --{} not found via {} @{}\n".format(ticker,modules,'tk2infoM'))
 				return []
@@ -60,13 +60,13 @@ def tk2info(ticker='',tablename='mapping_ticker_cik',colx='ticker',pgDB=None):
 	else:
 		return []
        
-def en2cnOLD(e='Metropolitan Bank Holding Corp'):
+def en2cn(e='Metropolitan Bank Holding Corp'):
 	from googletrans import Translator
 	c = Translator().translate(e,src='en',dest='zh-tw')
 	sys.stderr.write(" --Translate: {} -> {}\n".format(e,c.text))
 	return c.text
 
-def en2cn(e='Metropolitan Bank Holding Corp',src='en',dest='zh-TW'):
+def en2cnOLD(e='Metropolitan Bank Holding Corp',src='en',dest='zh-TW'):
 	from google_trans_new import google_translator as Translator
 	import html
 	dscr =html.unescape(e)
@@ -108,7 +108,7 @@ def t2l(ticker='',output='dict',quoteTF=True,dbname='ara'):
 		return batch_t2l(tkLst=ticker,output=output,quoteTF=quoteTF,dbname=dbname)
 
 	#- GET summaryProfile from mDB:yh_summaryProfile or onTheFly
-	dg = tk2infoM(ticker,tablename="yh_summaryProfile",funcArg='yh_financials',modules="summaryProfile",zpk={'ticker'},deltaTolerance=864000)
+	dg = tk2infoM(ticker,tablename="yh_summaryProfile",funcN='yh_financials',modules="summaryProfile",zpk={'ticker'},deltaTolerance=864000)
 	dg = renameDict(dg,{"sector":"sector_alias"})
 
 	#- GET basic ticker info from pgDB:mapping_ticker_cik 
@@ -148,7 +148,7 @@ def t2l(ticker='',output='dict',quoteTF=True,dbname='ara'):
 			df['industry_cn'] = df['industry'].values
 
 	#- GET summaryProfile from mDB:yh_quote_curr or onTheFly
-	dg = tk2infoM(ticker,tablename='yh_quote_curr',funcArg='yh_quote_comparison',zpk={'ticker'},deltaTolerance=900)
+	dg = tk2infoM(ticker,tablename='yh_quote_curr',funcN='yh_quote_comparison',zpk={'ticker'},deltaTolerance=900)
 	if all([len(df),len(dg)]):
 		df = df.merge(dg,on='ticker')
 		if 'trailingPE' in df:

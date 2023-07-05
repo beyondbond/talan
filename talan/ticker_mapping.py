@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 '''
+DEPRECATED, use ticker2cik.py for sec.gov edgar related info
 Get [CIK,SIC,Company] info from [TICKER] via
 http://www.sec.gov/cgi-bin/browse-edgar?CIK={ticker}&Find=Search&owner=exclude&action=getcompany&output=atom
 Get GIC [Sector] via

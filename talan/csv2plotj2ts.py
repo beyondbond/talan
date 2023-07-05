@@ -6,10 +6,12 @@
     Example:
 	# CPI/PPI historical comparison
 	psql.sh -d ara < cpippi_hist.sql|grep -v row|python3 csv2plotj2ts.py  --columns=series,value,pbdate  --xaxis=pbdate --pivot_group=series --pivot_value=value  --title="CPI/PPI 走勢" --x_fmt='%m/%Y' --extra_xs='pltStyle="classic";renColumns={"PPIFIS_PCTCHG":"PPI","CPIAUCNS_PCTCHG":"CPI"};ylabel="CPI/PPI (%)";endValueTF=True;yfmt="0.2f";' -
+	# treasury spread (10YR-3MO) with 2-YAXIS plot
+	printf 'select tsy_3_mo,tsy_10_yr,ROUND((tsy_10_yr-tsy_3_mo)::numeric,2) as "SPREAD_3MO_10YR", pbdate from tsy_hist where pbdate>=20220101 order by pbdate'|psql.sh -d ara|grep -v row |python3 csv2plotj2ts.py - --xaxis=pbdate --extra_xs='sharXTF=True;columns2="SPREAD_3MO_10YR";kind2="area";color2="lightgray";yfmt=",.2f";endValueTF=True;ylabel="TSY YIELD %";ylabel2="SPREAD %"' --title="TREASURY 10Y - 3MO SPREAD YEAR-TO-DATE" --debug
 	# treasury rates and spread with 2-YAXIS plot
-	printf 'select tsy_2_yr,tsy_10_yr,ROUND((tsy_10_yr-tsy_2_yr)::numeric,2) as "SPREAD_2_10YR", pbdate from tsy_hist where pbdate>=20220401 order by pbdate'|psql.sh -d ara|grep -v row |python3 csv2plotj2ts.py - --xaxis=pbdate --extra_xs='sharXTF=True;columns2="SPREAD_2_10YR";kind2="area";color2="lightgray";yfmt=",.2f"' --title="TREASURY 10Y - 2Y SPREAD in Q2/2022"
+	printf 'select tsy_2_yr,tsy_10_yr,ROUND((tsy_10_yr-tsy_2_yr)::numeric,2) as "SPREAD_2_10YR", pbdate from tsy_hist where pbdate>=20220101 order by pbdate'|psql.sh -d ara|grep -v row |python3 csv2plotj2ts.py - --xaxis=pbdate --extra_xs='sharXTF=True;columns2="SPREAD_2_10YR";kind2="area";color2="lightgray";yfmt=",.2f";endValueTF=True;ylabel="TSY YIELD %";ylabel2="SPREAD %"' --title="TREASURY 10Y-2Y SPREAD YTD"
 	# minute data for 3 major market indices
-	yh_hist_batch.py --range=1d --gap=1m   --no_database_save ^GSPC ^DJI ^IXIC --output=csv | python3 csv2plotj2ts.py  --columns=close,epochs,ticker  --xaxis=epochs --pivot_group=ticker --pivot_value=close  --title="美股大盤走勢$(date +%m/%d/%Y)" --return_since_inception --x_fmt='%H:%M' --extra_xs='pltStyle="classic";renColumns={"^GSPC":"標普500","^DJI":"道瓊指數","^IXIC":"納斯達克指數"}' -
+	yh_hist_batch.py --range=1d --gap=1m   --no_database_save ^GSPC ^DJI ^IXIC --output=csv | python3 csv2plotj2ts.py  --columns=close,epochs,ticker  --xaxis=epochs --pivot_group=ticker --pivot_value=close  --title="美股行情$(date +'%D %R')" --return_since_inception --x_fmt='%H:%M' --extra_xs='pltStyle="dark_background";renColumns={"^GSPC":"標普500","^DJI":"道瓊指數","^IXIC":"納斯達克指數"};yfmt=",.2f";endValueTF=True'  -
 	# daily data since begining of the year for 3 major market indices
 	yh_hist_batch.py --range=20210101, --gap=1d   --no_database_save ^GSPC ^DJI ^IXIC --output=csv | python3 csv2plotj2ts.py  --columns=close,pbdate,ticker  --xaxis=pbdate --pivot_group=ticker --pivot_value=close  --title="美股大盤$(date +%Y)年走勢" --return_since_inception --x_fmt='%m/%d' --extra_xs='pltStyle="classic";renColumns={"^GSPC":"標普500","^DJI":"道瓊指數","^IXIC":"納斯達克指數"}' -
 
@@ -78,7 +80,7 @@ def subDict(myDict,kyLst,reverseTF=False):
 
 def ymd_parser(x,fmt='%Y%m%d'): return datetime.strptime(str(x),fmt)
 
-def epoch_parser(x,s=1000): return datetime.fromtimestamp(int(x/s))
+def epoch_parser(x,s=1000): return pd.Timestamp.fromtimestamp(int(x/s)).round(freq='T')
 
 def extrapolate_series(yo):
 	yg=yo.dropna()
@@ -206,7 +208,7 @@ def plot_csvdata(df, nbins=6,rsiYN=False,title=None,pivot_value=None,pivot_group
 			idxpt=[ymd_parser(x,fmt=x_fmt) for x in df[pbname]]
 		df.set_index(pd.DatetimeIndex(idxpt),inplace=True)
 		df.index.rename(idxname,inplace=True)
-		df = df.drop(pbname,1)
+		df = df.drop([pbname],axis=1)
 	elif idxname in df.columns:
 		df[idxname] = pd.to_datetime(df[idxname])
 		df.set_index(idxname,inplace=True)
@@ -306,6 +308,10 @@ def plot_csvdata(df, nbins=6,rsiYN=False,title=None,pivot_value=None,pivot_group
 	#ds=[y for j,y in enumerate(df.index) if j%nsp==0]
 	#ax=df.plot(xticks=ds,title=title)
 	colorUD = ['red','green'] if lang=='cn' else ['green','red']
+	if pltStyle[:4]=='dark':
+		colorLst=['yellow','red','cyan','salmon','lightgray','pink']
+	else:
+		colorLst=['blue','red','green','salmon','lightgray','cyan']
 	if ohlcComboTF is True:
 		from alan_plot import plot_candlestickCombo
 		from _alan_calc import run_tech
@@ -344,7 +350,6 @@ def plot_csvdata(df, nbins=6,rsiYN=False,title=None,pivot_value=None,pivot_group
 		ax = plot_candlestick(df,tsidx=df.index,chartType=chartType,title=title,block=False,debugTF=debugTF,ax=ax,trendTF=trendTF,npar=npar,colorUD=colorUD)
 		x_fmt = "%H:%M" if chartType == 'minute' else x_fmt
 	else:
-		colorLst=['blue','red','green','salmon','lightgray','cyan']
 		if len(df.columns)>1 and sharexTF:
 			col2=df.columns[1]
 			df.plot(ax=ax,grid=True,color=colorLst,secondary_y=col2,x_compat=True)
@@ -378,12 +383,6 @@ def plot_csvdata(df, nbins=6,rsiYN=False,title=None,pivot_value=None,pivot_group
 		ax.set_ylabel(ylabel,fontproperties=fontProp(size=12))
 	elif rsiYN is True: # calc Returns Since Incept
 		ax.set_ylabel("Returns Since Inception (%)")
-	endValueTF=kwargs.pop('endValueTF',False)
-	if endValueTF:
-		for sx in df:
-			plt.annotate("{:{}}".format(df[sx].iloc[-1],yfmt), xy=(1, df[sx].iloc[-1]), xytext=(8, 0),
-				xycoords=('axes fraction', 'data'), textcoords='offset points')
-	ax.grid(linestyle='dotted',linewidth=0.5)
 	if df.index._typ == "datetimeindex":
 		if debugTF is True:
 			sys.stderr.write("==DF:\n{}\n".format(df.tail()))
@@ -421,6 +420,7 @@ def plot_csvdata(df, nbins=6,rsiYN=False,title=None,pivot_value=None,pivot_group
 			ax.xaxis.set_major_formatter(mddfmt)
 			sys.stderr.write("{} {}\n".format( "Second data use AutoDateLocator",xtinterval.seconds))
 		elif xtinterval.seconds and xtinterval.seconds < 100 : # minute data
+			ax.set_xlim(df.index[0], df.index[-1])
 			bym = [0,15,30,45] if nobs<=120 else [0,30] if nobs<=360 else [0]
 			xlocator = mdates.MinuteLocator(byminute=bym, interval = 1)
 			ax.xaxis.set_major_locator(xlocator)
@@ -442,6 +442,24 @@ def plot_csvdata(df, nbins=6,rsiYN=False,title=None,pivot_value=None,pivot_group
 		ax.legend(h1+h2, [ylabel]+[ylabel2], loc="upper left",prop=prop)
 	elif len(df.columns)>0 and sharexTF is False and ohlcTF is False:
 		ax.legend(df.columns,loc="upper left",prop=prop)
+	endValueTF=kwargs.pop('endValueTF',False)
+	if endValueTF:
+		for j,sx in enumerate(df):
+			try:
+				xl=mdates.date2num(df.index[-1])
+				cx=colorLst[j]
+				ax.annotate("{:{}}".format(df[sx].iloc[-1],yfmt), xy=(1, df[sx].iloc[-1]), xytext=(-25,25+15*j),
+					xycoords=('axes fraction', 'data'), textcoords='offset points', 
+					arrowprops=dict(arrowstyle='-|>',color=cx),size=10,color=cx)#,ha=('right'), va='bottom')
+			except Exception as e:
+				sys.stderr.write("**ERROR:{}. {} {!r:}\n".format(j,sx,str(e)))
+				continue
+		lgx=["{}: {:{}}%".format(x,y,yfmt) for x,y in zip(df.columns,df.iloc[-1])]
+		ax.legend(lgx,loc="upper left",prop=prop)
+		if debugTF:
+			sys.stderr.write(" --endValue List:\n{}\n{}\n".format(df.columns,df.iloc[-1].values))
+		sys.stderr.write(" --endValue List:\n{}\n{}\n".format(df.columns,df.iloc[-1].values))
+	ax.grid(linestyle='dotted',linewidth=0.5)
 	#ax.legend().set_visible(False)
 	#logo = mimage.imread("aicaas_icon.png")
 	#plt.figimage(logo, xo=20,yo=420)

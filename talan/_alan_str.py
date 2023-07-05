@@ -4,6 +4,12 @@
 program: _alan_str.py
 Description: ALAN string utility functions for jinja2
 Version: 0.91
+Usage of, 
+python3 -c 'from _alan_str import jj_fmt;r=jj_fmt("daily_macro_cn.j2",fileTF=True,dirname="templates");print(r)' 2> /dev/null
+OR
+python3 -c 'from _alan_str import jjf_fmt;r=jjf_fmt("daily_macro_cn.j2");print(r)' 2> /dev/null
+to run jinjia2 
+
 Functions:
   prerr(e,*args,**kargs):
   str_contains(va=[],subs=[],vb=[],uniqueTF=True):
@@ -118,6 +124,9 @@ Thu Aug 18 14:23:48 EDT 2022
 Fri Sep  2 17:35:32 EDT 2022
 + add cgi2dict()
 Fri Sep  9 10:25:12 EDT 2022
++ update check_latest_macro()
+replace ?_PCTCHG info as default macro data, no longer use `annual_rate` variable
+Fri 23 Dec 2022 04:40:31 PM EST
 """
 
 #from __future__ import print_function
@@ -144,6 +153,7 @@ from importlib import import_module
 # IMPORT external functions
 from _alan_date import next_date,ymd2dt,dt2ymd,s2dt
 from _alan_calc import saferun,subDict,subDF,subVDict,renameDict,getKeyVal,sqlQuery,conn2mgdb,safeRunArg
+from chatgptAPI import chatgptAPI
 
 if sys.version_info.major == 2:
 	reload(sys)
@@ -220,19 +230,25 @@ WHERE x.series=y.series ORDER BY pbdate DESC limit 13 """
 	#df = sqlQuery(open('latest_macro_vintage.sql').read())
 	df = sqlQuery(xqr)
 	in2wTF = tg_latest2week(ymd2dt(df['vntdate'].iloc[0]),cdt=cdt,nwk=nwk)
+	if in2wTF is None or len(in2wTF)<1:
+		return in2wTF
 
 	#=  Check If annualRate is calc when source='deriv' in the 'mapping_series_label' table
-	dg=sqlQuery("SELECT * from macro_hist_fred where series='{}' ORDER BY pbdate".format(df['series'].iloc[-1]+"_PCTCHG"))
+	seriesP=df['series'].iloc[-1]+"_PCTCHG"
+	xqr="""SELECT  x.value,x.pbdate,y.* from macro_hist_fred x, mapping_series_label y
+		WHERE x.series=y.series and x.series='{}' ORDER BY pbdate DESC """.format(seriesP)
+	dg=sqlQuery(xqr)
 	if len(dg)>0:
-		dg.rename(columns={"value":"annualRate"},inplace=True)
-		df = df.merge(dg[['annualRate','pbdate']],on='pbdate')
-		df['pctChange'] = df['annualRate'].diff(-1)
+		#dg.rename(columns={"value":"annualRate"},inplace=True)
+		#df = df.merge(dg[['annualRate','pbdate']],on='pbdate')
+		#df['pctChange'] = df['annualRate'].diff(-1)
+		df = dg
+		df['pctChange'] = df['value'].pct_change(-1)
 	else:
 		df['pctChange'] = df['value'].pct_change(-1)
 
-	if in2wTF is not None and len(in2wTF)>0:
-		in2wTF.update(df.iloc[0].to_dict())
-		in2wTF.update(f=df)
+	in2wTF.update(df.iloc[0].to_dict())
+	in2wTF.update(f=df)
 	return in2wTF
 
 
@@ -526,6 +542,11 @@ def run_jj2(ts,dd={},dirname='.',fileTF=False,debugTF=False):
 		#no loader environment specified for jjTemplate
 	else:
 		return(j2Env.get_template(ts).render(**dd))
+
+def jjf_fmt(ts,dirname='templates',fileTF=True,debugTF=False,j2onlyTF=False,**dd):
+	'''process jinja2 template string from file `{dirname}/{ts}`
+	'''
+	return jj_fmt(ts,dd,dirname=dirname,fileTF=fileTF,debugTF=debugTF,j2onlyTF=j2onlyTF)
 
 def jj2_fmt(ts,dirname='.',fileTF=False,debugTF=False,j2onlyTF=False,**dd):
 	return jj_fmt(ts,dd,dirname=dirname,fileTF=fileTF,debugTF=debugTF,j2onlyTF=j2onlyTF)
@@ -1142,7 +1163,7 @@ def find_mdb(jobj={},clientM=None,dbname='ara',tablename=None,field={},sortLst=[
 			mbson = dbM[tablename].find(jobj,zobj,sort=zsrt)
 		#mobj= json.loads(dumps(mbson))
 		mobj= [x for x in mbson]
-		clientM.close()
+		#clientM.close()
 		msg="success"
 	except Exception as e:
 		msg=str(e)
@@ -1283,12 +1304,13 @@ def insert_mdb(jobj={},clientM=None,port=27017,dbname='ara',tablename=None,wmode
 			ret=upd2mdb(jobj,zpk=zpk,mcur=mdb[tablename])
 		else:
 			ret=mdb[tablename].insert_many(jobj,ordered=ordered)
-		errmsg="Success:{}".format(len(ret))
+		errmsg="Success:{}\n".format(len(jobj))
 	except Exception as e:
 		errmsg="**ERROR:{} @{}\n".format(str(e),"insert_mdb:insert_many")
 		sys.stderr.write(errmsg)
 		try:
-			sys.stderr.write("---JOBJ[0]:\n{}\n".format(jobj[0]))
+			sys.stderr.write("---wmode:{},ordered:{},zpk:{}\n".format(wmode,ordered,zpk))
+			sys.stderr.write("---JOBJ[{}]: {}\n".format(len(jobj),jobj[:2]))
 		except:
 			pass
 		return {},None,errmsg
@@ -1900,7 +1922,7 @@ def x_screener(nobs=6,sortLst=['dollarValue'],ascLst=[False],dbname='ara',tablen
 	else:
 		return df
 
-def ssh2mg(sshUser='rstudio',rhost='api1.beyondbond.com',lhostLst=['bbapi1','api1','api1.beyondbond.com'],port=27017,**optx):
+def ssh2mg(sshUser='rstudio',rhost='api1.beyondbond.com',lhostLst=['bbapi1','api1','api1.beyondbond.com','BHS1','bhs1','bhs1.beyondbond.com'],port=27017,**optx):
 	''' remotely connect to server `rhost` mongoDB via ssh-tunnel
 		local connection rhost="localhost" 
 	'''

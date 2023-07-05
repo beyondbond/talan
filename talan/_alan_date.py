@@ -1,9 +1,12 @@
 #!/usr/bin/env python 
-"""
+"""Usage of: _alan_date.py FUNCNAME [JSON]
+----------------------------------------
 Program: _alan_date.py
-Description:
-	Date functions for ALAN,
-	convert daily price into monthly and update to prc_m_hist
+Description: Date functions for ALAN
+Example,
+./_alan_date.py s2dt
+OR
+./_alan_date.py next_month_date 'dict(months=2)'
 Functions:
 	def s2dt(s=None,dformat=''):
 	def get_start_end(start=None,end=None,dformat='',**kwargs):
@@ -25,9 +28,10 @@ Functions:
 	def daily2month(fromSql=None,tablename=None,dbname="ara",hostname="localhost",wmode='fail',fq='M',method='last'):
 	def tg_next2week(pdt,cdt=None,nwk=1):
 	def tg_latest2week(pdt,cdt=None,nwk=1):
-Last mod., Tue Apr 30 10:32:36 EDT 2019
+Last mod., Mon 03 Jul 2023 02:19:09 PM EDT
 Version: 0.70
 """
+__usage__='\n'.join(__doc__.split('\n')[:8])
 import sys
 import numpy as np
 from math import isinf, log
@@ -375,10 +379,34 @@ def utc2local(s,tz1='UTC',tz2='US/Eastern',fmt="%b-%d %I:%M%p %Z"):
 	import pandas as pd
 	return pd.Timestamp(s,tz=tz1).tz_convert(tz=tz2).strftime(fmt)
 
-if __name__ == '__main__':
+def tst101():
 	fromSql="SELECT * FROM spdr_price_hist WHERE ticker='{}' ORDER BY pbdate"
 	ticker=sys.argv[1] if len(sys.argv)>1 else "IBM"
 	fromSql=fromSql.format(ticker)
 
 	sys.stderr.write("{}\n".format(daily2month(fromSql).tail()))
 	print("20180221-20170320 in months:",delta2dates(20180221,20170320,fq="M"))
+
+def runArgs():
+	if sys.argv[1:]:
+		funcName=sys.argv[1]
+	else:
+		sys.exit(__usage__)
+	opts=eval(sys.argv[2]) if sys.argv[2:] else {}
+	if funcName in globals() and hasattr(globals()[funcName],'__call__'):
+		ret=globals()[funcName](**opts)
+	else:
+		sys.stderr.write("**ERROR: {}() Not Exist\n".format(funcName))
+		ret = __usage__
+	return ret
+
+def mainTst():
+	try:
+		ret = runArgs()
+	except Exception as e:
+		sys.stderr.write("**ERROR: {}\n".format(str(e)))
+		ret = __usage__
+	return ret
+	
+if __name__ == '__main__':
+	sys.exit(mainTst())

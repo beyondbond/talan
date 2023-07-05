@@ -5,7 +5,6 @@ from _alan_date import *
 from _alan_str import *
 from _alan_pppscf import batch_pppscf,vertex_locator,vertex_mnmx
 from yh_chart import *
-from webReader import webReader,streamReader, yhReader
 from yh_hist_batch import *
 from yh_predefined import bb_predefined
 from find_recent_eps import find_recent_eps

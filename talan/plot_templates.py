@@ -92,16 +92,19 @@ def plot_daily_conclusion(da,db=[],fig=None,ax=None,figsize=(11,6),backend='Agg'
 	if backend is not None:
 		plt.switch_backend(backend)
 	chartpath,chartname = gen_chartpath(**optx)
-	sns.set(style="whitegrid")
-
+	if 'snsStyle' in optx:
+		sns.set_style(optx.pop('snsStyle',"whitegrid"),{'grid.linestyle':'--'})
+	else:
+		plt.style.use(optx.pop('pltStyle',"dark_background"))
 	# define plot
 	if fig is None:
 		fig, ax = plt.subplots(figsize=figsize)
-	ax.grid(False, axis='y')
+	#ax.grid(False, axis='y')
+	ax.grid(optx.get('grid',True),linestyle='dotted',linewidth=0.5)
 	ax.spines['right'].set_color('none')
 	ax.spines['top'].set_color('none')
-	ax.spines['bottom'].set_color('none')
-	ax.spines['left'].set_color('none')
+	#ax.spines['bottom'].set_color('none')
+	#ax.spines['left'].set_color('none')
 
 	bottom=optx['bottom'] if 'bottom' in optx else 0.25
 
@@ -156,7 +159,7 @@ def plot_intraday_headline(tkLst=[],fig=None,ax=None,figsize=(11,6),backend='Agg
 	x_fmt = getKeyVal(optx,'x_fmt','%H:%M')    
 	#chartpath,chartname = gen_chartpath(**optx)    
 	from csv2plotj2ts import get_csv2plot,get_csvdata,subDict
-	opts ={'debugTF': True,'pngname': None, 'debugTF': True, 'rsiYN': True, 'renColumns': {'^IXIC': '納斯達克指數', '^DJI': '道瓊指數', '^GSPC': '標普500'}, 'colLst': 'change,pchg,close,epochs,ticker', 'hdrLst': None, 'npar': 15, 'days': 730, 'j2ts': None, 'start': None, 'pivot_group': 'ticker', 'gap': '1m', 'trendTF': False, 'ohlcTF': False, 'src': 'yh', 'pivot_value': 'close', 'pchgTF':True, 'end': None, 'title': '美股大盤走勢2019-09-17', 'lang': 'cn', 'backend': 'tkAgg', 'nbins': 6, 'tsTF': True, 'ranged': '1d', 'ohlcComboTF': False, 'sep': '|', 'interpolateYN': False, 'xaxis': 'epochs', 'pltStyle': 'classic', 'x_fmt': '%H:%M'}
+	opts ={'debugTF': True,'pngname': None, 'debugTF': True, 'rsiYN': True, 'renColumns': {'^IXIC': '納斯達克指數', '^DJI': '道瓊指數', '^GSPC': '標普500'}, 'colLst': 'change,pchg,close,epochs,ticker', 'hdrLst': None, 'npar': 15, 'days': 730, 'j2ts': None, 'start': None, 'pivot_group': 'ticker', 'gap': '1m', 'trendTF': False, 'ohlcTF': False, 'src': 'yh', 'pivot_value': 'close', 'pchgTF':True, 'end': None, 'title': '美股大盤走勢2019-09-17', 'lang': 'cn', 'backend': 'tkAgg', 'nbins': 6, 'tsTF': True, 'ranged': '1d', 'ohlcComboTF': False, 'sep': '|', 'interpolateYN': False, 'xaxis': 'epochs', 'pltStyle': 'dark_background', 'x_fmt': '%H:%M'}
 	if len(tkLst)<1:
 		tkLst= ['^GSPC', '^DJI', '^IXIC']
 	if len(chartpath)>5:
@@ -187,7 +190,10 @@ def plot_intraday_headline(tkLst=[],fig=None,ax=None,figsize=(11,6),backend='Agg
 
 	try:
 		plt.rcParams.update(plt.rcParamsDefault)
-		sns.set_style("whitegrid",{'grid.linestyle':'--'})
+		if 'snsStyle' in opts:
+			sns.set_style(opts.pop('snsStyle',"whitegrid"),{'grid.linestyle':'--'})
+		else:
+			plt.style.use(opts.pop('pltStyle',"dark_background"))
 		fig, ax=plt.subplots(figsize=figsize)
 		fig.autofmt_xdate()
 		if(opts['gap'][-1:]=='m'):
@@ -200,11 +206,12 @@ def plot_intraday_headline(tkLst=[],fig=None,ax=None,figsize=(11,6),backend='Agg
 		h_fmt = mdates.DateFormatter(x_fmt)
 		#ax.xaxis.set_major_locator(hours)
 		ax.xaxis.set_major_formatter(h_fmt)
-		ax.grid(False, axis='x')                        
+		#ax.grid(False, axis='x')
+		ax.grid(opts.get('grid',True),linestyle='dotted',linewidth=0.5)
 		ax.spines['right'].set_color('none')
 		ax.spines['top'].set_color('none')
-		ax.spines['bottom'].set_color('none')
-		ax.spines['left'].set_color('none')
+		#ax.spines['bottom'].set_color('none')
+		#ax.spines['left'].set_color('none')
 		#ax.set_ylabel('Returns Since Previous Close in %')
 		ax.set_ylabel('自前日收盤價報酬率%',fontproperties=fontProp())
 		plt.title(title,fontproperties=fontProp(size=15))
@@ -247,7 +254,7 @@ def plot_daily_macro(df,dv=[],fig=None,ax=None,figsize=(11,6),backend='Agg',titl
 		datax = psd(ticker,gap=gap,ranged=ranged,days=1500,src=src)
 		datax.rename(columns={'close':ticker}, inplace=True)
 		df = datax[[ticker]]
-		if src=='fred':
+		if src=='fred' and ticker[-7:]!='_PCTCHG':
 			tk2=ticker+'_PCTCHG'
 			dx2 = psd(tk2,src=src,days=1500)
 			if len(dx2)>0:
@@ -271,13 +278,17 @@ def plot_daily_macro(df,dv=[],fig=None,ax=None,figsize=(11,6),backend='Agg',titl
 			df = pd.DataFrame(data=df)
 		if fig is None:
 			plt.rcParams.update(plt.rcParamsDefault)            
-			sns.set_style("whitegrid",{'grid.linestyle':'--'})                 
+			if 'snsStyle' in optx:
+				sns.set_style(optx.pop('snsStyle',"whitegrid"),{'grid.linestyle':'--'})
+			else:
+				plt.style.use(optx.pop('pltStyle',"dark_background"))
 			fig, ax=plt.subplots(figsize=figsize)
-			ax.grid(False, axis='x')                        
+			#ax.grid(False, axis='x')                        
+			ax.grid(optx.get('grid',True),linestyle='dotted',linewidth=0.5)
 			ax.spines['right'].set_color('none')
 			ax.spines['top'].set_color('none')
-			ax.spines['bottom'].set_color('none')
-			ax.spines['left'].set_color('none')            
+			#ax.spines['bottom'].set_color('none')
+			#ax.spines['left'].set_color('none')            
 		if debugTF:
 			sys.stderr.write("===== DF:\n{}\n".format(df.tail()))
 		#ax.plot(df.index,df[ticker])
@@ -350,16 +361,20 @@ def plot_daily_mostactive(da,db=[],fig=None,ax=None,figsize=(11,6),backend='Agg'
 	if backend is not None:
 		plt.switch_backend(backend)
 	chartpath,chartname = gen_chartpath(**optx)
-	sns.set(style="whitegrid")
+	if 'snsStyle' in optx:
+		sns.set_style(optx.pop('snsStyle',"whitegrid"),{'grid.linestyle':'--'})
+	else:
+		plt.style.use(optx.pop('pltStyle',"dark_background"))
 
 	# define plot
 	if fig is None:
 		fig, ax = plt.subplots(figsize=figsize)
-	ax.grid(False, axis='y')
+	#ax.grid(False, axis='y')
+	ax.grid(optx.get('grid',True),linestyle='dotted',linewidth=0.5)
 	ax.spines['right'].set_color('none')
 	ax.spines['top'].set_color('none')
-	ax.spines['bottom'].set_color('none')
-	ax.spines['left'].set_color('none')
+	#ax.spines['bottom'].set_color('none')
+	#ax.spines['left'].set_color('none')
 
 	bottom=optx['bottom'] if 'bottom' in optx else 0.3
 
@@ -459,7 +474,10 @@ def plot_stock_performance(df,fig=None,ax=None,figsize=(11,6),backend='Agg',titl
 			df = pd.DataFrame(data=df)
 		if fig is None:
 			plt.rcParams.update(plt.rcParamsDefault)            
-			sns.set_style("whitegrid",{'grid.linestyle':'--'})                 
+			if 'snsStyle' in optx:
+				sns.set_style(optx.pop('snsStyle',"whitegrid"),{'grid.linestyle':'--'})
+			else:
+				plt.style.use(optx.pop('pltStyle',"dark_background"))
 			fig, ax=plt.subplots(figsize=figsize)
 			fig.autofmt_xdate()
 			ax.yaxis.set_major_formatter(StrMethodFormatter('{x:,.0f}'))
@@ -472,11 +490,12 @@ def plot_stock_performance(df,fig=None,ax=None,figsize=(11,6),backend='Agg',titl
 			h_fmt = mdates.DateFormatter(x_fmt)
 			#ax.xaxis.set_major_locator(hours)
 			ax.xaxis.set_major_formatter(h_fmt)
-			ax.grid(False, axis='x')                        
+			#ax.grid(False, axis='x')                        
+			ax.grid(optx.get('grid',True),linestyle='dotted',linewidth=0.5)
 			ax.spines['right'].set_color('none')
 			ax.spines['top'].set_color('none')
-			ax.spines['bottom'].set_color('none')
-			ax.spines['left'].set_color('none')
+			#ax.spines['bottom'].set_color('none')
+			#ax.spines['left'].set_color('none')
 			plt.title(title,fontproperties=fontProp(size=15))
 			plt.legend(frameon=False)            
 		plt.plot(df.index, df['close'])
@@ -537,16 +556,20 @@ def plot_daily_peers(da,db=[],fig=None,ax=None,figsize=(11,6),backend='Agg',char
 	if backend is not None:
 		plt.switch_backend(backend)
 	chartpath,chartname = gen_chartpath(**optx)
-	sns.set(style="whitegrid")
+	if 'snsStyle' in optx:
+		sns.set_style(optx.pop('snsStyle',"whitegrid"),{'grid.linestyle':'--'})
+	else:
+		plt.style.use(optx.pop('pltStyle',"dark_background"))
 
 	# define plot
 	if fig is None:
 		fig, ax = plt.subplots(figsize=figsize)
-	ax.grid(False, axis='y')
+	#ax.grid(False, axis='y')
+	ax.grid(optx.get('grid',True),linestyle='dotted',linewidth=0.5)
 	ax.spines['right'].set_color('none')
 	ax.spines['top'].set_color('none')
-	ax.spines['bottom'].set_color('none')
-	ax.spines['left'].set_color('none')
+	#ax.spines['bottom'].set_color('none')
+	#ax.spines['left'].set_color('none')
 
 	bottom=optx['bottom'] if 'bottom' in optx else 0.3
 
@@ -586,7 +609,10 @@ def plot_daily_peers(da,db=[],fig=None,ax=None,figsize=(11,6),backend='Agg',char
 	return chartpath,ax,fig
 
 def plot_peers_performance(df,fig=None,ax=None,figsize=(11,6),backend='Agg',title='',chartformat='svg',debugTF=False,**optx):
-	sns.set(style="whitegrid")
+	if 'snsStyle' in optx:
+		sns.set_style(optx.pop('snsStyle',"whitegrid"),{'grid.linestyle':'--'})
+	else:
+		plt.style.use(optx.pop('pltStyle',"dark_background"))
 	df['pchg']=df['pchg']*100
 	if 'ticker' in df and 'peRatio' in df:
 		df = pd.DataFrame(df.sort_values(by='peRatio').set_index('ticker',drop=True))
@@ -675,16 +701,20 @@ def plot_earnings_performance(da,db=[],fig=None,ax=None,figsize=(11,6),backend='
 	if backend is not None:
 		plt.switch_backend(backend)
 	chartpath,chartname = gen_chartpath(**optx)
-	sns.set(style="whitegrid")
+	if 'snsStyle' in optx:
+		sns.set_style(optx.pop('snsStyle',"whitegrid"),{'grid.linestyle':'--'})
+	else:
+		plt.style.use(optx.pop('pltStyle',"dark_background"))
 
 	# define plot
 	if fig is None:
 		fig, ax = plt.subplots(figsize=figsize)
-	ax.grid(False, axis='x')
+	#ax.grid(False, axis='x')
+	ax.grid(optx.get('grid',True),linestyle='dotted',linewidth=0.5)
 	ax.spines['right'].set_color('none')
 	ax.spines['top'].set_color('none')
-	ax.spines['bottom'].set_color('none')
-	ax.spines['left'].set_color('none')
+	#ax.spines['bottom'].set_color('none')
+	#ax.spines['left'].set_color('none')
 
 	bottom=optx['bottom'] if 'bottom' in optx else 0.3
 	da['pbdate'] = da.index.astype(str)
@@ -773,13 +803,17 @@ def plot_ts(df,dv=[],fig=None,ax=None,figsize=(11,6),backend='Agg',title='',char
 		if not isinstance(df,pd.DataFrame):
 			df = pd.DataFrame(data=df)
 		if fig is None:
-			sns.set_style("whitegrid",{'grid.linestyle':'--'})            
+			if 'snsStyle' in optx:
+				sns.set_style(optx.pop('snsStyle',"whitegrid"),{'grid.linestyle':'--'})
+			else:
+				plt.style.use(optx.pop('pltStyle',"dark_background"))
 			fig, ax=plt.subplots(figsize=figsize)
-			ax.grid(False, axis='x')
+			#ax.grid(False, axis='x')
+			ax.grid(optx.get('grid',True),linestyle='dotted',linewidth=0.5)
 			ax.spines['right'].set_color('none')
 			ax.spines['top'].set_color('none')
-			ax.spines['bottom'].set_color('none')
-			ax.spines['left'].set_color('none')            
+			#ax.spines['bottom'].set_color('none')
+			#ax.spines['left'].set_color('none')            
 		plt.plot(df.index,df.iloc[:,0])
 		plt.title(title,fontproperties=fontProp(size=30))
 		x_fmt = getKeyVal(optx,'x_fmt','') 

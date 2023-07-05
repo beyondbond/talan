@@ -8,7 +8,7 @@ RUN _actives in 'volume'
 python yh_predefined.py --no_database_save
 
 OR yh_predefined_query() call 
-python -c "from yh_predefined import yh_predefined_query as ypq;print(ypq())"
+python3 -c "from yh_predefined import yh_predefined_query as ypq;print(ypq())"
 
 OR bb_predefined() call most_actives in 'volume' and '>3% price change'
 python -c "from yh_predefined import bb_predefined as ypq;df=ypq('most_actives',addiFilter=1);print(df)"
@@ -22,6 +22,8 @@ from _alan_str import write2mdb,find_mdb
 from _alan_date import s2dt
 from _alan_calc import sqlQuery
 from _alan_optparse import parse_opt, subDict
+hds={'Content-Type': 'text/html', 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.115 Safari/537.36'}
+
 
 def bb_predefined(scrIds='most_actives',dbname='ara',saveDB=True,mappingTF=True,mmGap=30,addiFilter=1,debugTF=False,**optx):
 	''' 
@@ -56,7 +58,9 @@ def bb_predefined(scrIds='most_actives',dbname='ara',saveDB=True,mappingTF=True,
 		if len(df)>0:
 			if debugTF:
 				sys.stderr.write("===Use {} from MDB:{}\n".format(scrIds,tablename))
-			return df
+			if 'changePercent' in df:
+				df = df.loc[abs(df['changePercent']).sort_values(ascending=False).index].reset_index(drop=False)
+			return df.iloc[:6]
 		df=yh_predefined_query(scrIds,dfTF=True)
 		if len(df)<1: # using whatever in the DB if live pulling failed
 			df,_,_ = find_mdb(dbname=dbname,tablename=tablename,dfTF=True)
@@ -87,6 +91,8 @@ def bb_predefined(scrIds='most_actives',dbname='ara',saveDB=True,mappingTF=True,
 	except Exception as e:
 		sys.stderr.write("**ERROR: bb_predefined(): {}\n".format(str(e)))
 		df=[]
+	if 'changePercent' in df:
+		df = df.loc[abs(df['changePercent']).sort_values(ascending=False).index].reset_index(drop=False)
 	return df.iloc[:6]
 
 def screener_output_1(jobj):
@@ -108,7 +114,7 @@ def yh_predefined(scrIds='most_actives',debugTF=False,**optx):
 	'''
 	urx = 'https://query2.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=true&lang=en-US&region=US&scrIds={scrIds}&start=0&count=25&co'
 	url=urx.format(scrIds=scrIds)
-	ret = requests.get(url,timeout=3)
+	ret = requests.get(url,headers=hds,timeout=3)
 	jdTmp = ret.json()
 	return jdTmp
 

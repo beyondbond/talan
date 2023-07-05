@@ -6,7 +6,6 @@ Remote Model Calculation
 last mod., Tue Oct 27 17:30:23 EDT 2020
 '''
 import sys
-#sys.path.append("/apps/fafa/pyx/tst/")
 #from __future__ import print_function
 import pandas as pd, numpy as np, json, os, datetime
 import simplejson
@@ -18,7 +17,7 @@ from types import *
 from subprocess import Popen, PIPE
 from glob import glob, iglob
 from _alan_str import lsi2nlg_calc,combine_cmd2dict,jj_fmt,sysCall,find_mdb,write2mdb,dtCvt
-from _alan_calc import subDict,sqlQuery,getKeyVal,pqint,subDF,subDict,renameDict
+from _alan_calc import saferun,safeRunArg,subDict,sqlQuery,getKeyVal,pqint,subDF,subDict,renameDict
 from _alan_date import tg_latest2week,tg_next2week,next_date,dt2ymd,ymd2dt,s2dt,utc2local
 from alanapi import run_alanapi,opt_alanapi,search_comment,search_factor,search_quote,search_hist,search_history,search_list,search_allocation,search_mp3,search_ohlc
 #,udfStr,roundUSD
@@ -30,10 +29,9 @@ from importlib import import_module
 if sys.version_info.major == 2:
 	reload(sys)
 	sys.setdefaultencoding('utf8')
-pd.options.display.float_format='{:,.2f}'.format
-
-pd.set_option('display.max_colwidth', -1)
 pd.options.display.float_format = '{:,g}'.format
+#pd.options.display.float_format='{:,.2f}'.format
+#pd.set_option('display.max_colwidth', -1)
 
 def pqrint(*args,**kwargs):
 	return pqint(*args,**kwargs)
@@ -63,12 +61,14 @@ def display_page(pathname='index',request=None,**optx):
 def show_page(pathname='index',request=None,**optx):
 	sys.stderr.write("===START show_page request:{}\n".format(request))
 	opts=wrap_request(request)
+	opts.update(pathname=pathname)
 	sys.stderr.write(" --opts:{}\n".format(opts))
 	try:
 		pageBase=pathname
 		funcName='page_{}'.format(pageBase)
-		htmlName=opts.pop('html',None)
+		htmlName=optx.pop('html',None)
 
+		sys.stderr.write(" --show_page path:{} func:{} html:{} / opts:\n{}\n".format(pathname,funcName,htmlName,opts))
 		#----------------------------------------------------------------
 		if funcName=='page_api' and htmlName is None:
 			# Run 'page_api' command
@@ -83,10 +83,11 @@ def show_page(pathname='index',request=None,**optx):
 		elif funcName in globals() and hasattr(globals()[funcName],'__call__'):
 			# Run corresponding funcName like page_???()
 			pass
-		elif 'templates/{}'.format(htmlName) in glob('templates/*html'):
-			# Newly added @ Sat Oct 24 21:25:43 EDT 2020
-			# Process corresponding html page without funcName like page_???()
-			ret = process_page(htmlName, **opts)
+		elif "templates/{}".format(htmlName) in glob('templates/*html'):
+			# TBD, newly added @ Sun 22 Jan 2023 01:32:15 PM EST
+			# Process a dynamic page: dlp_???.html without funcName: page_???()
+			sys.stderr.write("++ Process {} with INPUT/opts:\n{}\n".format(htmlName,opts))
+			ret = process_page(htmlName, dd={}, **opts)
 			return ret
 		else:
 			# Run home page page_index() as default
@@ -136,20 +137,27 @@ def process_page(htmlName, dd, **opts):
 	#opts.update({"import_module":import_module})
 	#opts.update({"getattr":getattr})
 	opts.update({"exists":os.path.exists})
-	if isinstance(dd,dict):
-		datax=json.dumps(dd,default=dtCvt)
-		dd.update(datetime=datetime,pd=pd,s2dt=s2dt,utc2local=utc2local)
-		ret= render_template(htmlName,datax=datax,**dd)
-	elif isinstance(dd,list):
-		opts.update(datetime=datetime,pd=pd,s2dt=s2dt,utc2local=utc2local)
-		ret= render_template(htmlName,mtx=dd,**opts)
-	else:
-		opts.update(datetime=datetime,pd=pd,s2dt=s2dt,utc2local=utc2local)
-		ret= render_template(htmlName, content=dd,**opts)
 
 	sys.stderr.write("===processing page: {}\n".format(htmlName))
-	sys.stderr.write(" --opts: {}".format(opts)[:60]+"\n")
-	sys.stderr.write(" --data: {}".format(dd)[:200]+"\n")
+
+	# response datax/mtx/content as JSON.dumps/list/str respectively
+	if isinstance(dd,dict): # response output: `datax` as a `JSON` text
+		datax=json.dumps(dd,default=dtCvt)
+		opts.update(dd)
+		opts.update(datetime=datetime,pd=pd,s2dt=s2dt,utc2local=utc2local,json=json,locals=locals)
+		sys.stderr.write(" --opts: {}".format(opts)[:120]+"\n")
+		sys.stderr.write(" --datax[{}]: {}".format(type(dd),dd)[:200]+"\n")
+		ret= render_template(htmlName,datax=datax,**opts)
+	elif isinstance(dd,list): # response output: `mxt` as a `list` array
+		opts.update(datetime=datetime,pd=pd,s2dt=s2dt,utc2local=utc2local,json=json,locals=locals)
+		sys.stderr.write(" --opts: {}".format(opts)[:120]+"\n")
+		sys.stderr.write(" --mtx[{}]: {}".format(type(dd),dd)[:200]+"\n")
+		ret= render_template(htmlName,mtx=dd,**opts)
+	else: # response output: `content` as a `string` text
+		opts.update(datetime=datetime,pd=pd,s2dt=s2dt,utc2local=utc2local,json=json,locals=locals)
+		sys.stderr.write(" --opts: {}".format(opts)[:120]+"\n")
+		sys.stderr.write(" --content[{}]: {}".format(type(dd),dd)[:200]+"\n")
+		ret= render_template(htmlName, content=dd,**opts)
 
 	if isinstance(dd,dict) and 'submit' in dd: 
 		ret = make_response(ret)
@@ -159,7 +167,6 @@ def process_page(htmlName, dd, **opts):
 			ret.delete_cookie('userID')
 		elif dd['submit'] == 'delete':
 			ret.delete_cookie('userID')
-
 
 	return ret
 
@@ -183,6 +190,18 @@ def page_api(**optx):
 		dd=data
 	else:
 		dd=data
+	return dd
+
+@safeRunArg({})
+def page_chat(**optx):
+	from chatgptAPI import chatgptAPI as cg
+	optx.pop("submit",None)
+	prompt=optx.get('prompt','')
+	if not prompt:
+		optx.update(prompt="this is a test")
+	pqint(" -- page_chat INPUT:\n",optx, file=sys.stderr)
+	dd = cg(**optx)
+	dd.update(prompt=optx['prompt']) 
 	return dd
 
 def page_login(**optx):
@@ -275,25 +294,21 @@ def page_globalmacro(**optx):
 def page_apitest(**optx):
 	return page_api(**optx)
 
+@safeRunArg({})
 def wrap_request(request):
 	dd={}
 	pqint("===request METHOD: {}".format(request.method), file=sys.stderr)
 	optGet = request.args.to_dict()
 	pqint("===request GET Input:\t",optGet, file=sys.stderr)
-	optPost = request.get_json()
-	pqint("===request POST Input:\t",optPost,request.form, file=sys.stderr)
 	user = request.cookies.get('userID')
 	pqint("===request cookies user:{}".format(user) , file=sys.stderr)
-	if request.method=='POST':
-		if optGet is not None:
-			dd.update(optGet)
-		if optPost is not None:
+	if request.method=='POST' and request.is_json:
+		optPost = request.get_json(force=True)
+		pqint("===request POST Input:\t",optPost,request.form, file=sys.stderr)
+		if optPost and isinstance(optPost,dict):
 			dd.update(optPost)
-	else:
-		if optPost is not None:
-			dd.update(optPost)
-		if optGet is not None:
-			dd.update(optGet)
+	if optGet is not None:
+		dd.update(optGet)
 	if request.form is not None:
 		dd.update(request.form.to_dict(flat=True))
 	#if request.form is not None:

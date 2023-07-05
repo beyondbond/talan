@@ -29,56 +29,103 @@
     direct use _alan_calc.data_from_web function 
     Last mod., Tue Apr 16 09:18:04 EDT 2019
     Last mod., Mon Oct 11 13:05:32 EDT 2021
+	change `days` to string to allow ['1d','1mo','1y'] options
+    Last mod., Tue 04 Jul 2023 04:02:56 PM EDT
 """
 import sys
 from optparse import OptionParser
 import datetime
 import pandas as pd
 from sqlalchemy import create_engine
-from _alan_calc import data_from_web
+#from _alan_calc import data_from_web
+
+def yh_download(symbol,ranged='1d',period1=None,period2=None,**optx):
+	debugTF=optx.pop('debugTF',False)
+	if debugTF:
+		sys.stderr.write("===yh_download inputs: {}\n".format(locals()))
+	urx="https://query2.finance.yahoo.com/v7/finance/download/{}"
+	url=urx.format(symbol)
+	
+	if not any([period1,period2]) and ranged:
+		url+='?range={}'.format(ranged)
+	elif period1 and not period2:
+		period2=pd.Timestamp.now().strftime("%F")
+
+	if all([period1,period2]):
+		period1=pd.Timestamp(period1+" 00:00:00EDT").strftime("%s")
+		period2=pd.Timestamp(period2+" 23:59:59EDT").strftime("%s")
+		url+='?period1={}'.format(period1)
+		url+='&period2={}'.format(period2)
+
+	if debugTF:
+		sys.stderr.write(" --URL: {}\n".format(url))
+
+	df=pd.read_csv(url)
+	clx=[x.lower().replace('adj close','adjusted') for x in df.columns]
+	df.columns=clx
+	df['date']=[int(x.replace('-','')) for x in df['date']]
+	df['ticker']=symbol
+	if debugTF:
+		sys.stderr.write(" --DF:\n{}\n".format(df.tail(3)))
+	df.rename(columns={'date':'pbdate','ticker':'name'},inplace=True)
+	clx=['open','high','low','close','volume','adjusted','pbdate','name']
+	return df[clx]
 
 def batch_prc_temp(tkLst,dbname='ara',output=None,tablename='prc_temp_yh',
-	src='yh',days=1,end=None,hostname='localhost',wmode='replace',
+	src='yh',days='1d',end=None,hostname='localhost',wmode='replace',
 	tsTF=True,sep='|',indexTF=False,debugTF=False,saveDB=False,start=None):
 	""" Get yahoo price history via [pandas_datareader.data] 
 		from a list of tickers:[tkLst]
 		and save them into table:[tablename] and database URL: [dbURL]
 	"""
-	#for (ky,va) in opts.items():
-	#	exec("{}=va".format(ky))
-	try:
-		dbURL='postgresql://sfdbo@{}:5432/{}'.format(hostname,dbname)
-		engine = create_engine(dbURL) 
-	except:
-		sys.stderr.write( "***DB ERROR:{}".format(sys.exc_info()[1])+'\n')
-		engine = None
+	if debugTF:
+		sys.stderr.write("===batch_prc_temp inputs: {}".format( locals())+'\n')
+	engine = None
 	btime = datetime.datetime.now()
 	sys.stderr.write("BEGIN----- @ {} -----BEGIN".format(btime)+'\n')
 	rmode= wmode
-	for i,ticker in enumerate(tkLst):
-		sys.stderr.write("=== pulling {}: {}".format(i,ticker)+'\n')
+	dm=pd.DataFrame()
+	for i,ticker in enumerate(tkLst,1):
+		sys.stderr.write(" --{}. {} ...".format(i,ticker)+'\n')
 		try:
 			symbol=ticker.upper()
-			df=data_from_web(symbol,start=start,end=end,days=days,src=src,debugTF=debugTF)
+			#df=data_from_web(symbol,start=start,end=end,days=days,src=src,debugTF=debugTF)
+			df=yh_download(symbol,period1=start,period2=end,ranged=days,debugTF=debugTF)
 			if df is None or len(df)<1:
 				continue
-			if(engine is not None and saveDB is True) :
+			dm = pd.concat([dm,df])
+			if not engine and all([saveDB,hostname,dbname]):
+				dbURL='postgresql://sfdbo@{}:5432/{}'.format(hostname,dbname)
+				engine = create_engine(dbURL) 
+			if saveDB and engine:
 				df.to_sql(tablename,engine,schema='public',index=False,if_exists=rmode)
 				rmode= "append"
-			if debugTF is True:
-				sys.stderr.write("{}".format( df.tail(2))+'\n')
-			if output is not None and len(df)>0:
-				sys.stdout.write("{}".format(df.to_csv(sep=sep))) 
-			#yield df
+			sys.stderr.write(" --{}. {} DF({}) Done\n".format(i,ticker,len(df)))
+			if debugTF:
+				sys.stderr.write("\n{}".format( df.columns.values)+'\n')
+				sys.stderr.write("{} {}".format( df.values[0],0)+'\n')
+				if len(df)>1:
+					sys.stderr.write("{} {}".format( df.values[-1],len(df)-1)+'\n')
 		except Exception as e:
 			sys.stderr.write( "***ERROR {}:{} @ prc_temp_DN.batch_prc_temp():{}".format(i,symbol,str(e))+'\n')
 			continue
 
 	etime = datetime.datetime.now()
-	sys.stderr.write("Total time: {}".format(etime-btime)+'\n')
-	sys.stderr.write("END----- @ {} -----END".format(etime)+'\n')
+	sys.stderr.write(" --Run time: {}".format(etime-btime)+'\n')
+	sys.stderr.write("END------- @ {} -------END".format(etime)+'\n')
 	if(engine is not None) :
 		engine.dispose()
+	if output=='csv' and len(dm)>0:
+		sys.stdout.write("{}".format(dm.to_csv(index=indexTF,sep=sep))) 
+	elif output=='dict' and len(dm)>0:
+		sys.stdout.write("{}\n".format(dm.to_dict(orient='records'))) 
+	elif output=='json' and len(dm)>0:
+		sys.stdout.write("{}\n".format(dm.to_json(orient='records'))) 
+	elif output=='html' and len(dm)>0:
+		sys.stdout.write("{}\n".format(dm.to_html(index=indexTF))) 
+	elif output=='string' and len(dm)>0:
+		sys.stdout.write("{}\n".format(dm.to_string(index=indexTF))) 
+	return dm
 
 def opt_prc_temp_DN(argv,retParser=False):
 	""" command-line options initial setup
@@ -89,12 +136,12 @@ def opt_prc_temp_DN(argv,retParser=False):
 	"""
 	parser = OptionParser(usage="usage: %prog [option] SYMBOL1 ...", version="%prog 0.65",
 		description="Script to download Yahoo/FRED history")
-	parser.add_option("","--days",action="store",dest="days",default=1,type=int,
-		help="number of days from endDate (default: 1)")
+	parser.add_option("","--days",action="store",dest="days",default='1d',
+		help="number of days from endDate (default: 1d)")
 	parser.add_option("-s","--start",action="store",dest="start",
-		help="start YYYY-MM-DD (default: 1-day-ago)")
+		help="start YYYY-MM-DD (default: None)")
 	parser.add_option("-e","--end",action="store",dest="end",
-		help="end YYYY-MM-DD (default: today)")
+		help="end YYYY-MM-DD (default: None)")
 	parser.add_option("","--src",action="store",dest="src",default="yh",
 		help="source [fred|iex|yahoo](default: yh)")
 	parser.add_option("-d","--database",action="store",dest="dbname",default="ara",

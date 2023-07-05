@@ -33,7 +33,7 @@ if sys.version_info.major == 2:
 	sys.setdefaultencoding('utf8')
 
 # set pandas global display formula
-pd.set_option('display.max_colwidth', -1)
+#pd.set_option('display.max_colwidth', -1)
 pd.options.display.float_format='{:,.2f}'.format
 
 # set mongoDB database connection as globals()
@@ -315,6 +315,18 @@ def get_news_query(queryObj,**opts):
 		queryObj.update(ob)
 	return queryObj
 
+def chatgpt_comment(tkLst,fdLst,**optx):
+	from chatgptAPI import chatgptAPI;
+	vx="dbname,debugTF,end,hostname,instrument,lang,outTF,output,src,start,subtopic,tablename,topic".split(',')
+	for x in vx:
+		del optx[x]
+
+	res=chatgptAPI(**optx) 
+	if 'choices' in res:
+		return res['choices']
+	else:
+		return []
+
 def news_comment(tkLst,fdLst,lang='cn',dbname='ara',hostname='localhost',output='html',limit=200,**optx):
 	print("===@news_comment tkLst:{}, optx: {}".format(tkLst,optx),file=sys.stderr)
 	from _alan_str import ssh2mg
@@ -324,6 +336,8 @@ def news_comment(tkLst,fdLst,lang='cn',dbname='ara',hostname='localhost',output=
 	outTF=optx.pop('outTF',True)
 	tablename='rssNews'
 	jobj={}
+	transource=optx.pop('transource','google')
+	#transource=optx.pop('transource','openai')
 	subtopic=optx.get('subtopic','company')
 	sortLst=['pubDate']
 	data=[]
@@ -346,7 +360,7 @@ def news_comment(tkLst,fdLst,lang='cn',dbname='ara',hostname='localhost',output=
 			jobj={'_id':ObjectId(_id)}
 		field={'title','title_cn','summary','summary_cn'}
 		print("===Run Translation:",jobj,tablename,field,src,dest,file=sys.stderr)
-		data = me(jobj,clientM=clientM,tablename=tablename,field=field,src=src,dest=dest)
+		data = me(jobj,clientM=clientM,tablename=tablename,field=field,src=src,dest=dest,transource=transource)
 	else:
 		jobj = get_news_query(jobj,**optx)
 		pqint(" --->news query jobj:\n",jobj,file=sys.stderr)
@@ -434,7 +448,17 @@ def theme_comment(tkLst,fdLst,subtopic='ipo',**opts):
 	data = df # data = data_output(df,**opts)
 	return data
 
-def industry_comment(tkLst,fdLst,output=None,**opts):
+def industry_comment(tkLst,fdLst,dbname='ara',output=None,**opts):
+	tablename='record_hilo'
+	try:
+		field=['category_cn','ticker','close','pchg','pbdate','label_cn','comment']
+		data,_,err=find_mdb({}, dbname=dbname,tablename=tablename,field=field,sortLst={"category":-1},dfTF=True)
+	except Exception as e:
+		sys.stderr.write("**ERROR: {},{} @{}\n".format(ticker,str(e),'industry_comment'))
+		data=[]
+	return data
+
+def industry_commentOLD(tkLst,fdLst,output=None,**opts):
 	df = getlist_filter(fdLst=fdLst,subtopic='industry')
 	if not (tkLst is None or len(tkLst)<1 or tkLst[0] in ['','*']):
 		df = df[df['ticker'].isin(tkLst)]
@@ -444,7 +468,7 @@ def industry_comment(tkLst,fdLst,output=None,**opts):
 	return data
 
 def search_comment(tkLst,fdLst,**opts):
-	topicLst='hourly|news|report|theme|peers|industry|MFRM|news1'.split('|')
+	topicLst='hourly|news|report|theme|peers|industry|MFRM|news1|chatgpt'.split('|')
 	topic=getKeyVal(opts,'topic','MFRM')
 	if topic not in topicLst:
 		return None
@@ -594,7 +618,7 @@ def geteach_minute_web(ticker,fdLst,**opts):
 	if src=='yh':
 		#datax = get_minute_yh(ticker,ranged='1d',tsTF=True,debugTF=False)
 		#d=ysh([ticker],saveDB=False,range='1d',types='chart',interval='5m',debugTF=True)
-		d=runOTF(ysh,ticker,deltaTolerance=900,types='chart',tablename='yh_chart_hist',zpk=['ticker','pbdt'],range='15m',interval='5m',debugTF=True,dbname='ara')
+		d=runOTF(ticker,ysh,deltaTolerance=900,types='chart',tablename='yh_chart_hist',zpk=['ticker','pbdt'],range='15m',interval='5m',debugTF=True,dbname='ara')
 		if len(d)>0:
 			datax=pd.DataFrame(d)
 		else:
@@ -656,7 +680,7 @@ def geteach_daily_history(ticker,fdLst,**opts):
 		datax = pullStockHistory(ticker,pgDB=pgDB,**opts)
 		if datax is None or len(datax)<1:
 			sys.stderr.write("**WARNING:{}\n".format("data not found in DB, live pulling"))
-			datax=runOTF(ysh,ticker,deltaTolerance=86400,types='chart',tablename='yh_daily_hist',zpk=['ticker','pbdt'],range='1y',interval='1d',debugTF=True,dbname='ara')
+			datax=runOTF(ticker,ysh,deltaTolerance=86400,types='chart',tablename='yh_daily_hist',zpk=['ticker','pbdt'],range='1y',interval='1d',debugTF=True,dbname='ara')
 			datax=pd.DataFrame(datax)
 	except Exception as e:
 		pqint("**ERROR:{} @ {}, opts:\n{}".format(str(e),'geteach_daily_history',opts) ,file=sys.stderr)

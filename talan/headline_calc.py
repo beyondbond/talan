@@ -140,7 +140,7 @@ def find_hiloRecord(ticker='^GSPC',end=None,days=366,debugTF=False):
 	#from record_hilo import find_record_hilo as frh
 	from record_hilo import recordHiLo as frh
 	from _alan_calc import pull_stock_data as psd
-	df=psd(ticker,end=end,days=days,pchgTF=True)
+	df=psd(ticker,end=end,days=days,pchgTF=True,searchDB=False)
 	endDT=df.index[-1]
 	jobj=frh(df,endDT,ticker,debugTF=debugTF)
 	hiloRecord = jobj['YTD'] if jobj['YTD'] else {}

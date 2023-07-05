@@ -24,11 +24,13 @@ lmap = lambda f, itr: list(map(f, itr))
 def saferun(func):
 	'''
 	Decorator for try_except to wrap func(...) 
-	Error return is an empty string ""
-
+	`errmsg` default as "" or used-defined
 	Usage of,
 	@saferun 
 	def func(...):
+	or
+	@saferun 
+	def func(...,errmsg=None):
 	----------------------------------------------------------------------
 	'''
 	def wrapped_f(*args, **kwargs):
@@ -36,7 +38,8 @@ def saferun(func):
 		try:
 			return func(*args, **kwargs)
 		except Exception as e:
-			sys.stderr.write("**ERROR: {},\nreturn {}\n".format(str(e),ret))
+			ret=kwargs.pop('errmsg',ret)
+			sys.stderr.write("**ERROR: {} @ {}\n".format(str(e),func.__name__))
 			return ret
 	wrapped_f.__name__=func.__name__
 	wrapped_f.__doc__=func.__doc__
@@ -81,7 +84,7 @@ class safeRunArg(object):
 			try:
 				return func(*args, **kwargs)
 			except Exception as e:
-				errMsg="**ERROR: {}\n{}".format(str(e),self.arg1)
+				errMsg="**ERROR: {} @ {}\n{}".format(str(e),func.__name__,self.arg1)
 				sys.stderr.write(errMsg+"\n")
 				return self.arg1
 		#wrapped_f.register = dispatcher.register
@@ -298,7 +301,6 @@ def conn2db(engine=None,dbname=None,hostname="localhost",port=5432,dialect='post
 		elif all([hostname,port,dbname]):
 			dbURL='{}{}://{}@{}:{}/{}'.format(dialect,driver,user,hostname,port,dbname)
 			engine = create_engine(dbURL)
-		pqint( "===DB-Driver:",engine, file=sys.stderr)
 	except:
 		pqint( "***DB ERROR:", sys.exc_info()[1], file=sys.stderr)
 	return engine

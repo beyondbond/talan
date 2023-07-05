@@ -265,6 +265,7 @@ def yh_hist(ticker=None,gap='1m',ranged='1d',hdrTF=True,tsTF=True,debugTF=False,
 		colv += ['xclose','change','pchg']
 	colx = [x for x in colv if x in clx ]
 	sys.stderr.write("{}\n{}\n{}\n".format(colx,colv,clx))
+	sys.stderr.write("{}\n".format(dx[colx].head()))
 	sys.stderr.write("{}\n".format(dx[colx].tail()))
 	return dx[colx]
 

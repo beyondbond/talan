@@ -103,11 +103,13 @@ def run_ohlc_fcs(ticker,opts=None,debugTF=False,pgDB=None,**kwargs):
 	#return ret
 	if opts['dwmTF'] is True:
 		#dwm=pandas2ri.conversion.rpy2py(ret[1])
-		dwm=ret[1]
+		#dwm=ret[1]
+		dwm=pd.DataFrame({x:y for x,y in ret[1].items()})
 		dwm['ticker']=ticker
 	else:
 		dwm=pd.DataFrame()
-	dd=ret[0]
+	#dd=ret[0]
+	dd=pd.DataFrame({x:y for x,y in ret[0].items()})
 	dd['ticker']=ticker
 	dd['freq']=freq
 	if debugTF:

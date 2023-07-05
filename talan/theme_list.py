@@ -167,7 +167,7 @@ def add_sector_industry(df=[]):
 	if len(df)<1:
 		return []
 	tkLst=df['ticker'].values
-	datax=runOTF('yh_financials',list(df['ticker'].values),modules="summaryProfile",dbname='ara',tablename="yh_summaryProfile",zpk={'ticker'},deltaTolerance=8640000)
+	datax=runOTF(list(df['ticker'].values),'yh_financials',modules="summaryProfile",dbname='ara',tablename="yh_summaryProfile",zpk={'ticker'},deltaTolerance=8640000)
 	if len(datax)<1:
 		return df
 	dg =  subDict(pd.DataFrame(datax),['ticker','sector','industry'])

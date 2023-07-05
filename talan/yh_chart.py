@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-''' Live datafeed from yahoo quotes
+'''Stock feed from yahoo finance
+Usage of,
+./yh_chart.py TICKER[,TICKER2, ...] [JSON]
+Example,
+./yh_chart.py IBM,AAPL --no_database_save
+OR
+./yh_chart.py AAPL,IBM '{"types":"spark","dfTF":True,"saveDB":False}' --funcname=yh_spark_hist
+-------------------------------------------
 Update tables:
 mDB: ara::yh_spark_hist, ara::yh_quote_curr
 pgDB: ara::yh_quote_curr (isEoD=True)
 
-Usage of:
-+ From commandline: 
-python3 yh_chart.py IBM,AAPL
-python3 yh_chart.py IBM AAPL
-echo "IBM AAPL" | python3 yh_chart.py -
 
 #-------------------------------------------------------------------------
 + For a list of tickers 'tkLst' with direct function call for pricing data
@@ -24,28 +26,28 @@ printf "^GSPC ^IXIC ^DJI ^SOX" | python3 -c "import sys;from yh_chart import yh_
 #-------------------------------------------------------------------------
 + For specific 'ticker' of either non-existed ticker or if not updated in the last 'deltaTolerance' seconds
   -- To setup onTheFly stock quote for non-existed ticker or if not updated in the last 'deltaTolerance' seconds
-python3 -c "ticker='AAPL';from yh_chart import yh_quote_comparison as yqc, runOTF;ret=runOTF(yqc,ticker,deltaTolerance=3600,tablename='yh_quote_curr',zpk=['ticker']);"
+python3 -c "ticker='AAPL';from yh_chart import yh_quote_comparison as yqc, runOTF;ret=runOTF(ticker,yqc,deltaTolerance=3600,tablename='yh_quote_curr',zpk=['ticker']);"
   -- To setup onTheFly stock intra-day spark history for non-existed ticker or if not updated in the last 'deltaTolerance' seconds
-python3 -c "tkLst='AAPL';from yh_chart import yh_spark_hist as ysh, runOTF;ret=runOTF(ysh,ticker,deltaTolerance=900,tablename='yh_spark_hist',zpk=['ticker','pbdt'],ranged='15m',interval='5m',debugTF=True,dbname='test');"
+python3 -c "tkLst='AAPL';from yh_chart import yh_spark_hist as ysh, runOTF;ret=runOTF(ticker,ysh,deltaTolerance=900,tablename='yh_spark_hist',zpk=['ticker','pbdt'],ranged='15m',interval='5m',debugTF=True,dbname='test');"
   -- To setup onTheFly financials 'modules' for non-existed ticker or if not updated in the last 'deltaTolerance' seconds (86400 for 1-day)
-python3 -c "ticker='AAPL';from yh_chart import runOTF, yh_financials as yh;ret=runOTF(yh,ticker,deltaTolerance=86400,modules='incomeStatementHistoryQuarterly',tablename='yh_financials',dbname='yh',zpkChk=['ticker','module'],zpk=['ticker','module','pbdate']);"
+python3 -c "ticker='AAPL';from yh_chart import runOTF, yh_financials as yh;ret=runOTF(ticker,yh,deltaTolerance=86400,modules='incomeStatementHistoryQuarterly',tablename='yh_financials',dbname='yh',zpkChk=['ticker','module'],zpk=['ticker','module','pbdate']);"
   -- To setup onTheFly stock intra-day chart history for non-existed ticker or if not updated in the last 'deltaTolerance' seconds (TBD)
-python3 -c "tkLst='AAPL';from yh_chart import yh_spark_hist as ysh, runOTF;ret=runOTF(ysh,ticker,deltaTolerance=900,types='chart',tablename='yh_chart_hist',zpk=['ticker','pbdt'],ranged='15m',interval='5m',debugTF=True,dbname='ara');"
+python3 -c "tkLst='AAPL';from yh_chart import yh_spark_hist as ysh, runOTF;ret=runOTF(ticker,ysh,deltaTolerance=900,types='chart',tablename='yh_chart_hist',zpk=['ticker','pbdt'],ranged='15m',interval='5m',debugTF=True,dbname='ara');"
 
 #-------------------------------------------------------------------------
 + From Direct function call for financial keyStatistics
 python3 -c "from yh_chart import qS_keyStatistics as yks;yks(saveDB=True,debugTF=True)"
   -- To run Quarterly income_statement
-python3 -c "from yh_chart import yh_financials_batch as yf;yf(modules='incomeStatementHistoryQuarterly',tablename='yh_IS_Q',zpk={'ticker','pbdate'});"
+python3 -c "from yh_chart import yh_financialsubatch as yf;yf(modules='incomeStatementHistoryQuarterly',tablename='yh_IS_Q',zpk={'ticker','pbdate'});"
 python3 -c "from yh_chart import yh_financials_batch as yf;yf(modules='incomeStatementHistoryQuarterly',tablename='yh_IS_Q',zpk={'ticker','pbdate'},useDB=True);"
   -- To run Annual income_statement
 python3 -c "from yh_chart import yh_financials_batch as yf;yf(modules='incomeStatementHistory',tablename='yh_IS_A',zpk={'ticker','pbdate'});"
 + NOTE:
   -- below 3 calls are equivalent (1st one perferred, see onTheFlyDB_tst for better reference)
-python3 -c "ticker='DAL';from yh_chart import runOTF, yh_financials as yh;ret=runOTF(yh,ticker,deltaTolerance=86400,modules='incomeStatementHistoryQuarterly',tablename='yh_financials',dbname='yh',zpkChk=['ticker','module'],zpk=['ticker','module','pbdate']);"
+python3 -c "ticker='DAL';from yh_chart import runOTF, yh_financials as yh;ret=runOTF(ticker,yh,deltaTolerance=86400,modules='incomeStatementHistoryQuarterly',tablename='yh_financials',dbname='yh',zpkChk=['ticker','module'],zpk=['ticker','module','pbdate']);"
 python3 -c "tkLst=['DAL'];from yh_chart import func2mdb as yhb;dd=yhb(tkLst,dbname='test',tablename='test1',funcN='yh_batchTypes',zpk={'ticker','pbdate'},types='quoteSummary',modules='incomeStatementHistoryQuarterly',debugTF=True);print(dd)"
 python3 -c "tkLst=['DAL'];from yh_chart import yh_financials_batch as yf;yf(tkLst,modules='incomeStatementHistory',dbname='test',tablename='test1',zpk={'ticker','module','pbdate'});"
-python3 -c "ticker=['AAPL','DAL'];from yh_chart import runOTF, yh_financials as yf;ret=runOTF(yf,ticker,deltaTolerance=86400*90,modules='"summaryProfile"',tablename='"yh_summaryProfile"',dbname='ara',zpkChk=['ticker','module'],zpk=['ticker','module','pbdate']);"
+python3 -c "ticker=['AAPL','DAL'];from yh_chart import runOTF, yh_financials as yf;ret=runOTF(ticker,yf,deltaTolerance=86400*90,modules='"summaryProfile"',tablename='"yh_summaryProfile"',dbname='ara',zpkChk=['ticker','module'],zpk=['ticker','module','pbdate']);"
 
   -- To run summaryProfile  and save to MDB: yh_summaryProfile table
 python3 -c "tkLst=['SHAK'];from yh_chart import func2mdb as yhb;dd=yhb(tkLst,tablename='yh_summaryProfile',funcN='yh_batchTypes',zpk=['ticker'],types='quoteSummary',modules='summaryProfile',debugTF=True);print(dd)"
@@ -66,16 +68,26 @@ python3 -c "from yh_chart import yh_quote_comparison as yqc;print(yqc(['AAPL']))
 
 Last mod.,
 Wed May 27 10:20:54 EDT 2020
------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------
 '''
-import sys, datetime
+__usage__='\n'.join(__doc__.split('\n')[:8])
+import sys, datetime, re
 import requests
 import numpy as np
 import pandas as pd
 from pandas.io.json import json_normalize
 from _alan_str import write2mdb,find_mdb,insert_mdb,upsert_mdb,get_arg2func
 from _alan_calc import getKeyVal,conn2pgdb,conn2mgdb,renameDict,subDict,subDF,saferun,safeRunArg
+
 headers={'Content-Type': 'text/html', 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.115 Safari/537.36'}
+credentials={}
+apiBase = 'https://query2.finance.yahoo.com'
+
+def getCredentials(cookieUrl='https://fc.yahoo.com', crumbUrl=apiBase+'/v1/test/getcrumb'):
+	cookies = requests.get(cookieUrl).cookies
+	crumb = requests.get(url=crumbUrl, cookies=cookies, headers=headers).text
+	return {'cookies': cookies, 'crumb': crumb}
+
 
 def epoch_parser(x,s=1000): return datetime.datetime.fromtimestamp(int(x/s))
 
@@ -97,7 +109,9 @@ def list2chunk(v,n=100):
 
 
 def yh_spark_hist(tkLst=None,**optx):
-	sys.stderr.write("++yh_spark_hist():optx: {}\n".format(optx))
+	debugTF=optx.get('debugTF',False)
+	if debugTF:
+		sys.stderr.write("===optx in yh_spark_hist():\n{}\n".format(optx))
 	dd = yh_batchSpark(tkLst=tkLst,**optx)
 	if optx.pop('dfTF',False) and not isinstance(dd,pd.DataFrame):
 		dd = pd.DataFrame(dd)
@@ -109,6 +123,8 @@ def yh_spark_hist(tkLst=None,**optx):
 			pbdt = np.vectorize(epoch_parser)(dd['epochs'])
 			dd.set_index(pd.DatetimeIndex(pbdt),inplace=True)
 		dd.index.name='date'
+	if debugTF:
+		sys.stderr.write("===END yh_spark_hist():\n{}".format(dd)[:256]+" ...\n")
 	return dd
 
 def useWeb(jobj={'ticker':'^GSPC'},colx='pbdt',dbname='ara',tablename='yh_quote_curr',mmGap=30,**optx):
@@ -117,15 +133,18 @@ def useWeb(jobj={'ticker':'^GSPC'},colx='pbdt',dbname='ara',tablename='yh_quote_
 
 	'''
 	from _alan_calc import conn2mgdb
+	if not tablename:
+		return True
 	debugTF=getKeyVal(optx,'debugTF',False)
 	webTF=optx.pop('webTF',None)
 	if webTF is not None and isinstance(webTF,bool):
 		return webTF
-	cdt=getKeyVal(optx,'cdt',datetime.datetime.now())
+	currDt=pd.Timestamp.now(tz='US/Eastern')
+	cdt=getKeyVal(optx,'cdt',currDt)
 	mgDB=conn2mgdb(dbname=dbname)
 
 	dc = mgDB[tablename].find_one({"$query":jobj,"$orderby":{colx:-1}},{colx:1,"_id":0})
-	if len(dc)<1:
+	if dc is None or len(dc)<1:
 		return True
 	pdt=dc[colx]
 	mmPassed=pd.Timedelta(cdt - pdt).total_seconds() / 60.0
@@ -143,6 +162,7 @@ def yh_quote_curr(tkLst=None,screenerTF=False,dbname='ara',tablename='yh_quote_c
 		from _alan_calc import sqlQuery
 		tkDF=sqlQuery('select ticker from mapping_ticker_cik where act_code=1')
 		tkLst=list(tkDF['ticker'])
+	d=[]
 	try:
 		jobj=dict(ticker=tkLst[0])
 		if webTF is None:
@@ -154,8 +174,7 @@ def yh_quote_curr(tkLst=None,screenerTF=False,dbname='ara',tablename='yh_quote_c
 			return d
 		d=yh_quote_comparison(tkLst,screenerTF=screenerTF,dbname=dbname,tablename=tablename,zpk=zpk,**optx)
 	except Exception as e:
-		sys.stderr.write("**ERROR: {}:{}:{}\n".format("yh_quote_curr()","@ yh_quote_comparison",str(e)))
-		d=[]
+		sys.stderr.write("**ERROR: {}@{}:{}\n".format("yh_quote_curr()","yh_quote_comparison",str(e)))
 	saveDB=optx.pop('saveDB',False)
 	if not saveDB:
 		return d
@@ -171,7 +190,9 @@ def yh_quote_curr(tkLst=None,screenerTF=False,dbname='ara',tablename='yh_quote_c
 	try:
 		dbM = conn2mgdb(dbname=dbname)
 		tablename = tablename.replace('curr','hist')
-		ret=dbM[tablename].insert_many(d.to_dict(orient='records'),ordered=False)
+		if isinstance(d,pd.DataFrame):
+			d = d.to_dict(orient='records')
+		ret=dbM[tablename].insert_many(d,ordered=False)
 		sys.stderr.write("===Saving history: {dbname}::{tablename}".format(**locals()))
 	except Exception as e:
 		sys.stderr.write("**ERROR: {}:{}:{}\n".format("yh_quote_curr()","MDB saving...",str(e)))
@@ -186,7 +207,7 @@ def qS_keyStatistics(tkLst=[],tablename='qS_keyStatistics',saveDB=False,debugTF=
 	if tkLst is None or len(tkLst)<1:
 		tkLst = list(pull_act_tickers()['ticker'])
 	dbM=None
-	pbdt=datetime.datetime.now()
+	pbdt=pd.Timestamp.now(tz='US/Eastern')
 	jdM=yh_batchTypes(tkLst,types='quoteSummary',modules='defaultKeyStatistics',debugTF=debugTF)
 	for jx in jdM:
 		jx['pbdt']=pbdt
@@ -298,9 +319,20 @@ def yh_batchRaw(tkLst=[],filter='*',types='spark',ranged='5m',interval='1m',debu
 	'''
 	Pulling finance.yahoo data based on the 'types' of [spark|quote|chart]
 	'''
+	global credentials
 	if tkLst is None or len(tkLst)<1:
 		return {}
-	if types in ['spark','quote']:
+	if types in ['quote']:
+		if not credentials:
+			credentials=getCredentials()
+			if debugTF:
+				sys.stderr.write("==GET CREDENTIALS: {}\n".format(credentials))
+
+		crumb,cookies = (credentials['crumb'],credentials['cookies'])
+		utmp = 'https://query1.finance.yahoo.com/v7/finance/{}?corsDomain=finance.yahoo.com&.tsrc=finance&'
+		urx = utmp + 'symbols={}&crumb={}'
+		url = urx.format(types,','.join(tkLst),crumb)
+	elif types in ['spark']:
 		utmp = 'https://query1.finance.yahoo.com/v7/finance/{}?corsDomain=finance.yahoo.com&.tsrc=finance&'
 		urx = utmp + 'symbols={}&range={}&interval={}'
 		url = urx.format(types,','.join(tkLst),ranged,interval)
@@ -318,9 +350,10 @@ def yh_batchRaw(tkLst=[],filter='*',types='spark',ranged='5m',interval='1m',debu
 	elif filter != '*':
 		ftx="&indicators={}".format(filter)
 		url += ftx
-	if debugTF is True:
-		sys.stderr.write("==URL:\n{}\n".format(url))
-	res=requests.Session().get(url,headers=headers)
+	if types=='quote':
+		res=requests.Session().get(url,headers=headers,cookies=cookies)
+	else:
+		res=requests.Session().get(url,headers=headers)
 	#res=requests.get(url,timeout=5)
 	if debugTF:
 		sys.stderr.write("=====URL STATUS:{}\n{}\n{}\n".format(res.status_code,tkLst,url))
@@ -498,8 +531,8 @@ def yh_batchSpark(tkLst=[],filter='*',types='spark',nchunk=20,saveDB=True,dbname
 			if saveDB is True:
 				m,dbM,err=insert_mdb(jdM,clientM=dbM,tablename=tablename,zpk=zpk,**optx)
 				if debugTF:
-					sys.stderr.write("++optx: {}\n".format(optx))
-					sys.stderr.write("=== {} of {} saved to {}\n".format(tkM,jdM[-1],tablename))
+					sys.stderr.write("++yh_batchSpark(optx): {}\n".format(optx))
+					sys.stderr.write("=== SAVE {} data({}) {} to {}\n".format(tkM,len(jdM),jdM[-1],tablename))
 			jdN.extend(jdM)
 		else: # for case of types.lower()=='quote'
 			jdLst = jdTmp['quoteResponse']['result']
@@ -631,13 +664,15 @@ def yh_batchTypes(tkLst=[],filter='*',types='quote',nchunk=20,modules='summaryPr
 			else:
 				jdX = jdTmp[types]['result']
 			if debugTF:
-				sys.stderr.write("==={}.{}\njdTmp\n{}\njdX\n{}\n".format(j,tkM,jdTmp,jdX[-1]))
+				sys.stderr.write("\n==={}.{}\n".format(j,tkM))
+				sys.stderr.write("---jdTmp: {}".format(jdTmp)[:80]+" ...\n")
+				sys.stderr.write("---jdX: {}".format(jdX[-1])[:80]+" ...\n\n")
 		except Exception as e:
 			sys.stderr.write("**ERROR: {}:{}\n".format(types,str(e)))
 			continue
 		jdM.extend(jdX)
 	if debugTF:
-		sys.stderr.write("===jdM:\n{}".format(jdM))
+		sys.stderr.write("===jdM:\n{}".format(jdM)[:128]+" ...\n")
 	return jdM
 
 # DEPRECATED
@@ -667,6 +702,7 @@ def yh_hist_query(tkLst=[],filter='*',types='quote',nchunk=20,rawTF=False,screen
 	Pull minute ohlc pricing data from Yahoo but use marketVolume as volume
 	since market data has 15-minute delay, latest 15 marketVolumes become 0 
 	'''
+	saveDB=optx.get('saveDB',False)
 	if len(tkLst)<1:
 		tkLst = list(pull_act_tickers()['ticker'])
 	jdLst = yh_batchTypes(tkLst,filter=filter,types=types,nchunk=nchunk,debugTF=debugTF,**optx)
@@ -696,7 +732,7 @@ def yh_hist_query(tkLst=[],filter='*',types='quote',nchunk=20,rawTF=False,screen
 				if rawTF:
 					renameDict(jdTmp,mapper=newNames)
 					if debugTF:
-						sys.stderr.write("{}\n".format(jdTmp))
+						sys.stderr.write("===jdTmp:\n{}".format(jdTmp)[:128]+" ...\n")
 					if screenerTF==True:
 						colx=["change","changePercent","company","marketCap","close","ticker","volume","epochs","pbdt"]
 						#ds=raw2screener_output_1(jdTmp)
@@ -707,9 +743,8 @@ def yh_hist_query(tkLst=[],filter='*',types='quote',nchunk=20,rawTF=False,screen
 						ds =  subDict(jdTmp,colx)
 					else:
 						ds = jdTmp 
-					if all([dbname,tablename]):
+					if all([dbname,tablename,saveDB]):
 						zpk=getKeyVal(optx,'zpk',['ticker','epochs'])
-						#mobj,clientM,err_msg = write2mdb(ds,clientM,dbname=dbname,tablename=tablename,zpk=zpk)
 						mobj,clientM,err_msg = insert_mdb(ds,clientM,dbname=dbname,tablename=tablename,zpk=zpk)
 						if debugTF:
 							sys.stderr.write("{}\nSave to {}::{}\n".format(ds,dbname,tablename))
@@ -799,13 +834,14 @@ def func2mdb(tkLst,tablename='yh_spark_hist',dbname='ara',funcN='yh_hist_query',
 	except Exception as e:
 		sys.stderr.write("**ERROR: {}:{}\n".format("func2mdb()",str(e)))
 	return df	
+
 def renewChk(pbdtCurr,pbdtMod,deltaTolerance=86400):
 	deltaPassed=pd.Timedelta(pbdtCurr - pbdtMod).total_seconds()
 	sys.stderr.write(" --curr:{},last:{}:deltaPassed:{}\n".format(pbdtCurr,pbdtMod,deltaPassed))
 	return deltaPassed>deltaTolerance
 
 def lastRunChk(objChk={},tableChk='',deltaTolerance=43200,clientM=None,dbname='ara',**optx):
-	pbdtCurr=pd.datetime.now()
+	pbdtCurr=pd.Timestamp.now(tz='US/Eastern')
 	lastObj,clientM,_=find_mdb(objChk,clientM=clientM,dbname=dbname,tablename=tableChk,limit=1)
 	if not lastObj:
 		pbdtMod=pbdtCurr
@@ -818,37 +854,34 @@ def lastRunChk(objChk={},tableChk='',deltaTolerance=43200,clientM=None,dbname='a
 	objChk.update(pbdt=pbdtMod)
 	return renewTF,objChk,clientM
 
-def batchOTF(funcArg,tkLst=[],tableChk='',zpkChk=["ticker"],deltaTolerance=43200,**optx):
+def batchOTF(tkLst=[],**optx):
 	for ticker in tkLst: 
-		sys.stderr.write("==Batch Running:{} on {}\n".format(ticker,funcArg))
-		runOTF(funcArg,ticker,tableChk,zpkChk=zpkChk,deltaTolerance=deltaTolerance,**optx)
+		sys.stderr.write("==Batch Running:{} on {}\n".format(ticker,optx))
+		runOTF(ticker,**optx)
 
 @safeRunArg([])
-def runOTF(funcArg,ticker='',tableChk='',zpkChk=["ticker"],deltaTolerance=43200,**optx):
+def runOTF(ticker='',funcN='',tableChk='',zpkChk=["ticker"],deltaTolerance=43200,**optx):
+	'''Fetch data from web/DB based on `deltaTolerance` in seconds
+	Required valid inputs: ticker, funcN, tablename
 	'''
-	To  ticker='AAPL'
-	where real-time data is only grab based on 'deltaTolerance' in seconds
-	current setup is half-days
-	'''
-
+	debugTF=optx.get('debugTF',False)
 	if isinstance(ticker,list):
 		tkLst=ticker
-		dLst=[]
 		for tkX in tkLst: 
-			sys.stderr.write("==BATCH Running:{} on {}\n".format(ticker,funcArg))
-			dd = runOTF(funcArg,tkX,tableChk,zpkChk=zpkChk,deltaTolerance=deltaTolerance,**optx)
-			if isinstance(dd,list):
-				dLst.extend(dd)
-			else:
-				dLst.extend([dd])
-		return dLst
+			sys.stderr.write("==BATCH runOTF:{} on {}\n".format(ticker,funcN))
+			dd = runOTF(tkX,funcN,tableChk,zpkChk=zpkChk,deltaTolerance=deltaTolerance,**optx)
+		return dd
 
-	if isinstance(funcArg,str):
-		if funcArg in globals() and hasattr(globals()[funcArg],'__call__'):
-			funcArg =  globals()[funcArg]
-		else:
+	if isinstance(funcN,str) and funcN in globals() and hasattr(globals()[funcN],'__call__'):
+			funcArg =  globals()[funcN]
+	elif funcN in globals().values() and hasattr(funcN,'__call__'):
+			funcArg =funcN
+	else:
 			return []
-	sys.stderr.write("==START Running:{} on {}\n".format(ticker,funcArg))
+	sys.stderr.write("==START runOTF:{} on {}\n".format(ticker,funcArg))
+	if not optx.get('saveDB',False):
+		retObj = funcArg(ticker,**optx)
+		return retObj
 	dbname=getKeyVal(optx,'dbname','ara')
 	optx.update({'dbname':dbname})
 	tablename=getKeyVal(optx,'tablename','')
@@ -862,16 +895,22 @@ def runOTF(funcArg,ticker='',tableChk='',zpkChk=["ticker"],deltaTolerance=43200,
 	if not tableChk:
 		tableChk=tablename+'_chk'
 	renewTF,objChk,clientM = lastRunChk(objChk=objChk,tableChk=tableChk,deltaTolerance=deltaTolerance,**optx)
+	if debugTF:
+		sys.stderr.write("==tableChk:{}".format(tableChk))
+		sys.stderr.write(": {} {} {}\n".format(renewTF,objChk,clientM))
 	if renewTF:
-		sys.stderr.write("==Data outdated or never run, Running:{}\n".format(funcArg))
+		sys.stderr.write("==Data outdated or never run, Running:{}\n".format(funcN))
 		retObj = funcArg(ticker,**optx)
+		if len(retObj)<1 and debugTF:
+			sys.stderr.write("**WARNING:{}({},{}) @runOTF:\n".format(funcN,ticker,optx))
 		if len(retObj)<1:
 			return []
-
+		if isinstance(retObj,pd.DataFrame):
+			retObj=retObj.to_dict(orient='records')
 		xChk={ky:val for ky,val in retObj[0].items() if ky in zpkChk}
 		objChk.update(xChk)
+		sys.stderr.write(" --Updating {} to {}\n".format(objChk,tableChk))
 		retObj,clientM,errChk = upsert_mdb(retObj,**optx)
-		sys.stderr.write(" --Update {} to {}\n".format(objChk,tableChk))
 		objChk,clientM,errChk = upsert_mdb(objChk,clientM=clientM,tablename=tableChk,zpk=zpkChk)
 	else:
 		sys.stderr.write("==Data exist, LoadFromTable:{}\n".format(tablename))
@@ -880,24 +919,101 @@ def runOTF(funcArg,ticker='',tableChk='',zpkChk=["ticker"],deltaTolerance=43200,
 		retObj,clientM,errMsg = find_mdb(objChk,clientM=clientM,**optx)
 	return retObj
 
-def main_tst():
-	args = sys.argv[1:]
-	if len(args)<1:
-		#exit(0)
-		args=['AAPL','IBM']
-	elif len(args)==1 and ',' in args[0]:
-		args = args[0].split(',')
-	elif len(args)==1 and '-' in args[0]:
-		args = sys.stdin.read().strip().split()
-	#df = yh_spark_hist(args)
-	#df = yh_hist_query(args,types='spark',ranged='1d',pchgTF=False)
-	#df = yh_hist_query(args,types='quote',pchgTF=False,filter='symbol,regularMarketPrice,regularMarketChange,regularMarketOpen,regularMarketDayHigh,regularMarketDayLow,regularMarketVolume')
-	#df = yh_hist_query(args,types='quote')
-	df = yh_quote_curr(args)
-	if isinstance(df,list):
-		sys.stderr.write("\n{}".format(df))
-	else:
-		sys.stderr.write("\n{}".format(df.to_string()))
+from optparse import OptionParser
+def get_opts(argv,retParser=False):
+	""" command-line options initial setup
+	    Arguments:
+		argv:   list arguments, usually passed from sys.argv
+		retParser:      OptionParser class return flag, default to False
+	    Return: (options, args) tuple if retParser is False else OptionParser class
+	"""
+	parser = OptionParser(usage="usage: %prog [option] SYMBOL1[,...] [JSON]", version="%prog 0.01",
+		description="Pull Price History from YAHOO")
+	parser.add_option("","--types",action="store",dest="types",default='quote',
+		help="list of types:[chart,spark,quote] (default: quote)")
+	parser.add_option("","--funcname",action="store",dest="funcname",default="yh_quote_curr",
+		help="access function [yh_quote_curr|yh_hist_querry]  (default: yh_quote_curr)")
+	parser.add_option("","--range",action="store",dest="ranged",default='1d',
+		help="range period from now (default: 1d)")
+	parser.add_option("","--gap",action="store",dest="gap",default='1m',
+		help="interval GAP of data frequency (default: 1m)")
+	parser.add_option("-d","--database",action="store",dest="dbname",default="ara",
+		help="database (default: ara)")
+	parser.add_option("","--host",action="store",dest="hostname",default="localhost",
+		help="db host (default: localhost)")
+	parser.add_option("-t","--table",action="store",dest="tablename",
+		help="db tablename (default: None)")
+	parser.add_option("-w","--wmode",action="store",dest="wmode",default="replace",
+		help="db table write-mode [replace|append] (default: replace)")
+	parser.add_option("-o","--output",action="store",dest="output",
+		help="OUTPUT type [csv|html|json] (default: no output)")
+	parser.add_option("","--no_datetimeindex",action="store_false",dest="tsTF",default=True,
+		help="no datetime index (default: use datetime)")
+	parser.add_option("","--show_index",action="store_true",dest="indexTF",default=False,
+		help="show index (default: False) Note, OUTPUT ONLY")
+	parser.add_option("-s","--sep",action="store",dest="sep",default="|",
+		help="output field separator (default: |) Note, OUTPUT ONLY")
+	parser.add_option("","--no_database_save",action="store_false",dest="saveDB",default=True,
+		help="no save to database (default: save to database)")
+	parser.add_option("","--extra_js",action="store",dest="extraJS",
+		help="extra JSON in DICT format.")
+	parser.add_option("","--extra_qs",action="store",dest="extraQS",
+		help="extra GET string format like k1=v1&k2=v2; ")
+	parser.add_option("","--extra_xs",action="store",dest="extraXS",
+		help="extra excutable string like k1=v1;k2=v2; ")
+	parser.add_option("","--debug",action="store_true",dest="debugTF",default=False,
+		help="debugging (default: False)")
+	(options, args) = parser.parse_args(argv[1:])
+	try:
+		from _alan_str import extra_opts
+		opts = vars(options)
+		extra_opts(opts,xkey='extraJS',method='JS',updTF=True)
+		extra_opts(opts,xkey='extraQS',method='QS',updTF=True)
+		extra_opts(opts,xkey='extraXS',method='XS',updTF=True)
+		opts.update(args=args,narg=len(args))
+	except Exception as e:
+		sys.stderr.write(str(e)+"\n")
+	if retParser is True:
+		return parser
+	return (opts, args)
 
+def runArgs():
+	# GET options
+	(opts, args)=get_opts(sys.argv)
+	if not opts.get('tablename',None):
+		opts.pop('tablename')
+		#opts.update(saveDB=False)
+
+	funcName=opts.pop('funcname','yh_quote_curr')
+
+	# PROCESS arguments
+	if len(args)<1:
+		return __usage__
+	tkLst = args[0].split(',')
+	if tkLst[0]=='-':
+		tkLst = re.split('[\s,]',sys.stdin.read().strip())
+	optj=eval(args[1]) if args[1:] else {}
+	kLst=["args","narg","extraJS","extraQS","extraXS"]
+	keys_to_remove = set(kLst).intersection(set(opts.keys()))
+	for k in keys_to_remove:
+		del opts[k]
+	opts.update(optj)
+
+	# RUN 
+	if funcName in globals() and hasattr(globals()[funcName],'__call__'):
+		ret=globals()[funcName](tkLst,**opts)
+	else:
+		sys.stderr.write("**ERROR: {}() Not Exist\n".format(funcName))
+		return __usage__
+	return ret
+
+def mainTst():
+	try:
+		ret = runArgs()
+	except Exception as e:
+		sys.stderr.write("**ERROR: runArgs:{}\n".format(str(e)))
+		ret = __usage__
+	return ret
+	
 if __name__ == '__main__':
-	main_tst()
+	sys.exit(mainTst())

@@ -19,6 +19,8 @@ OR
 record_hilo.py --extra_xs='nlookback=200;colx="close";"' 'CNY=X'
 OR
 record_hilo.py --extra_xs='nlookback=200;colx="close";";mthLst=[-1,-3]' 'CNY=X'
+OR
+python3 -c "from record_hilo import get_titlehead as gt;d=gt(tablename='record_hilo');print(d)"
 '''
 
 import sys
@@ -41,6 +43,9 @@ def is_record_hl(dx,colx='pchg',**nd_args):
 	startAT=ds.index[0] # actual startDate in datetime
 	#sys.stderr.write("===Act:{}, Start:{}, Args:{}\n".format(startAT,startDT,nd_args))
 	return mnxTF,hilo,idxmnx,startDT,startAT
+
+def hilo(v):
+	return 1 if v[::-1].argmax()==0 else (-1 if v[::-1].argmin()==0 else 0)
 
 def find_hilo(ds):
 	'''
@@ -225,8 +230,9 @@ def record_hilo_tst(opts={},**optx):
 			if jobj['YTD']:
 				sys.stderr.write("{}\n".format(jobj['YTD']))
 				if tablename is not None:
-					zpk={"ticker","pbdate"}
-					mobj,clientM,msg = write2mdb(jobj,clientM,tablename=tablename,zpk=zpk)
+					#zpk={"ticker","pbdate"}
+					zpk={"ticker"}
+					mobj,clientM,msg = upsert_mdb(jobj,clientM,tablename=tablename,zpk=zpk)
 		except Exception as e:
 			continue
 	return jobj
@@ -268,6 +274,7 @@ def titlehead_backtest(opts={},**optx):
 			ticker,freq,src,label_cn,category_cn = dLst[['series','freq','source','label_cn','category_cn']].iloc[jx]
 			if freq != 'D':
 				continue
+			searchDB = (False if src=='yahoo' else True)
 			df = psd(ticker,days=days,src=src,debugTF=debugTF,pchgTF=True,searchDB=searchDB)
 			try:
 				dx = df.iloc[:-lkbx] if lkbx>0 else df
@@ -296,7 +303,8 @@ def titlehead_backtest(opts={},**optx):
 		dm = pd.DataFrame(dm)
 		ds = dm.sort_values(by=['days','category_seq','category_label_seq'],ascending =[False,True,True])
 		if tablename is not None:
-			zpk={"ticker","pbdate"}
+			#zpk={"ticker","pbdate"}
+			zpk={"ticker"}
 			sys.stderr.write("Save to {}:\n{}\n".format(tablename,dm))
 			mobj,clientM,msg = upsert_mdb(dm,tablename=tablename,dbname=dbname,zpk=zpk)
 	return ds
